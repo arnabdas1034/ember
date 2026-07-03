@@ -9,6 +9,10 @@ dist
 # Downloadable at build time via `npm run fetch:model` — too big for git
 resources/models
 
+# Intermediate icon artifacts (only icon.svg + icon.icns are needed)
+resources/icon-1024.png
+resources/icon.iconset
+
 # Server runtime data (accounts, encrypted keys, secret) — never commit
 server/data
 server/node_modules
