@@ -55,7 +55,8 @@
       {
         "provider": "github",
         "owner": "arnabdas1034",
-        "repo": "ember"
+        "repo": "ember",
+        "releaseType": "release"
       }
     ],
     "directories": {
