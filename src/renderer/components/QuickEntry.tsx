@@ -27,10 +27,10 @@ export function QuickEntry() {
     setShot(null)
   }
 
-  const capture = async () => {
+  const capture = async (mode: 'region' | 'window') => {
     setCapturing(true)
     try {
-      const img = await ember.quick.capture()
+      const img = await ember.quick.capture(mode)
       if (img) setShot(img)
     } finally {
       setCapturing(false)
@@ -84,11 +84,19 @@ export function QuickEntry() {
 
         <div className="flex items-center gap-2 px-3 pb-3" style={{ WebkitAppRegion: 'no-drag' } as any}>
           <button
-            onClick={capture}
+            onClick={() => capture('region')}
             disabled={capturing}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-line text-sm text-ink-soft hover:bg-cream-sunk disabled:opacity-50"
           >
-            {capturing ? 'Selecting…' : '⌘ Screenshot'}
+            {capturing ? 'Selecting…' : 'Screenshot'}
+          </button>
+          <button
+            onClick={() => capture('window')}
+            disabled={capturing}
+            title="Click a window to attach it"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-line text-sm text-ink-soft hover:bg-cream-sunk disabled:opacity-50"
+          >
+            Window
           </button>
           <button
             onClick={submit}

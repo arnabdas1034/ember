@@ -7,6 +7,7 @@ import { mcp } from './mcp'
 import { resolvePermission, changedFiles, revertChanges } from './agent'
 import { checkForUpdates, quitAndInstall } from './updater'
 import { sync } from './sync'
+import { runOAuth } from './oauth'
 import type { ChatRequest } from '../shared/types'
 
 // The currently signed-in user for this window. Single-window app.
@@ -105,6 +106,30 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
     await mcp.ensureConnected(userId, json)
     return mcp.status(userId, json)
   })
+  // OAuth-authorize a remote MCP connector: browser sign-in → bearer token → save.
+  handle('mcp:oauth', async (opts: any) => {
+    const userId = requireUser()
+    const result = await runOAuth({
+      authUrl: opts.authUrl,
+      tokenUrl: opts.tokenUrl,
+      clientId: opts.clientId,
+      clientSecret: opts.clientSecret,
+      scope: opts.scope
+    })
+    const json = store.getMcpJson(userId)
+    const config = json.trim() ? JSON.parse(json) : {}
+    config.mcpServers = config.mcpServers || {}
+    let name = opts.name || 'oauth-connector'
+    let i = 2
+    while (config.mcpServers[name]) name = `${opts.name}-${i++}`
+    config.mcpServers[name] = { url: opts.serverUrl, headers: { Authorization: `Bearer ${result.access_token}` } }
+    const next = JSON.stringify(config, null, 2)
+    store.setMcpJson(userId, next)
+    await mcp.disconnectAll(userId)
+    await mcp.ensureConnected(userId, next)
+    return mcp.status(userId, next)
+  })
+
   handle('mcp:status', async () => {
     const userId = requireUser()
     const json = store.getMcpJson(userId)

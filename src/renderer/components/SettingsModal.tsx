@@ -522,6 +522,7 @@ function ConnectorDirectory({ onAdd }: { onAdd: (def: ConnectorDef, values: Reco
   }
 
   return (
+    <>
     <div className="grid grid-cols-2 gap-2.5">
       {CONNECTORS.map((def) => (
         <div key={def.id} className="border border-line rounded-xl p-3.5 bg-cream-panel">
@@ -561,6 +562,70 @@ function ConnectorDirectory({ onAdd }: { onAdd: (def: ConnectorDef, values: Reco
           )}
         </div>
       ))}
+    </div>
+    <OAuthConnectorForm />
+    </>
+  )
+}
+
+function OAuthConnectorForm() {
+  const [open, setOpen] = useState(false)
+  const [f, setF] = useState({ name: '', serverUrl: '', authUrl: '', tokenUrl: '', clientId: '', clientSecret: '', scope: '' })
+  const [msg, setMsg] = useState('')
+  const [busy, setBusy] = useState(false)
+  const set = (k: string, v: string) => setF((s) => ({ ...s, [k]: v }))
+  const authorize = async () => {
+    setBusy(true)
+    setMsg('A browser window will open — sign in, then return here.')
+    try {
+      await ember.mcp.oauth(f)
+      setMsg(`Connected "${f.name}" via OAuth.`)
+    } catch (e: any) {
+      setMsg(e?.message || 'OAuth failed.')
+    } finally {
+      setBusy(false)
+    }
+  }
+  const fields: [string, string, string?][] = [
+    ['name', 'Connector name', 'my-drive'],
+    ['serverUrl', 'MCP server URL', 'https://mcp.example.com/mcp'],
+    ['authUrl', 'Authorization URL', 'https://accounts.google.com/o/oauth2/v2/auth'],
+    ['tokenUrl', 'Token URL', 'https://oauth2.googleapis.com/token'],
+    ['clientId', 'Client ID', 'from the provider'],
+    ['clientSecret', 'Client secret (optional)', ''],
+    ['scope', 'Scopes (space-separated)', 'https://www.googleapis.com/auth/drive.readonly']
+  ]
+  return (
+    <div className="mt-4 border border-line rounded-xl p-3.5 bg-cream-panel">
+      <button onClick={() => setOpen(!open)} className="flex items-center gap-2 text-sm font-medium text-ink w-full">
+        <span className="text-clay">{open ? '▾' : '▸'}</span> Connect with OAuth (Google, Slack, Notion…)
+        <span className="ml-auto text-xs text-ink-faint">browser sign-in</span>
+      </button>
+      {open && (
+        <div className="mt-3 space-y-2">
+          <p className="text-xs text-ink-faint leading-snug">
+            Register an OAuth app with the provider, allow redirect URI <code className="text-[11px]">http://127.0.0.1</code>{' '}
+            (any loopback port), then paste its details here and authorize in your browser.
+          </p>
+          {fields.map(([k, label, ph]) => (
+            <input
+              key={k}
+              value={(f as any)[k]}
+              onChange={(e) => set(k, e.target.value)}
+              placeholder={`${label}${ph ? ` — ${ph}` : ''}`}
+              className="w-full px-3 py-1.5 rounded-lg border border-line bg-cream text-xs outline-none focus:border-clay/60"
+            />
+          ))}
+          <button
+            onClick={authorize}
+            disabled={busy || !f.name || !f.serverUrl || !f.authUrl || !f.tokenUrl || !f.clientId}
+            className="px-3 py-1.5 rounded-lg bg-clay text-white text-xs font-medium hover:bg-clay-dark disabled:opacity-50"
+          >
+            {busy ? 'Waiting for sign-in…' : 'Authorize in browser'}
+          </button>
+          {msg && <p className="text-xs text-ink-soft">{msg}</p>}
+        </div>
+      )}
     </div>
   )
 }

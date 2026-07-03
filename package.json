@@ -1,6 +1,6 @@
 {
   "name": "ember",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Ember — a Claude-style desktop AI workspace powered by your own Anthropic API key",
   "author": "arnabdas1034",
   "license": "MIT",
@@ -23,7 +23,10 @@
     "@anthropic-ai/sdk": "latest",
     "@huggingface/transformers": "^4.2.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "electron-updater": "^6.3.9"
+    "docx": "^9.7.1",
+    "electron-updater": "^6.3.9",
+    "exceljs": "^4.4.0",
+    "pptxgenjs": "^4.0.1"
   },
   "devDependencies": {
     "@types/react": "^18.3.12",
@@ -69,13 +72,6 @@
       {
         "from": "resources/models",
         "to": "models"
-      }
-    ],
-    "publish": [
-      {
-        "provider": "github",
-        "owner": "YOUR_GITHUB_USERNAME",
-        "repo": "ember"
       }
     ],
     "mac": {

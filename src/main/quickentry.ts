@@ -66,17 +66,19 @@ function toggleOverlay() {
 
 let capturing = false
 
-// Interactive region screenshot via macOS `screencapture -i` (crosshair drag),
-// returned as a base64 PNG. Resolves null if the user cancels.
-function captureRegion(): Promise<{ data: string; mediaType: string } | null> {
+// Interactive screenshot via macOS `screencapture`. mode 'region' = crosshair drag
+// (-i), mode 'window' = click a window to capture it (-iW, like Claude's window
+// context). Returns a base64 PNG, or null if the user cancels.
+function capture(mode: 'region' | 'window' = 'region'): Promise<{ data: string; mediaType: string } | null> {
   return new Promise((resolve) => {
     if (process.platform !== 'darwin') return resolve(null)
     capturing = true
     const out = join(tmpdir(), `ember-shot-${Date.now()}.png`)
-    // -i interactive, -x no sound. The app briefly hides so it isn't captured.
+    const flag = mode === 'window' ? '-iW' : '-i'
+    // -x no sound. The app briefly hides so it isn't captured.
     const wasVisible = overlay?.isVisible()
     overlay?.hide()
-    exec(`screencapture -i -x "${out}"`, () => {
+    exec(`screencapture ${flag} -x "${out}"`, () => {
       capturing = false
       if (wasVisible) {
         overlay?.show()
@@ -100,7 +102,7 @@ function captureRegion(): Promise<{ data: string; mediaType: string } | null> {
 export function registerQuickEntry(getMainWindow: () => BrowserWindow | null) {
   getMain = getMainWindow
 
-  ipcMain.handle('quick:capture', () => captureRegion())
+  ipcMain.handle('quick:capture', (_e, mode?: 'region' | 'window') => capture(mode || 'region'))
   ipcMain.handle('quick:close', () => {
     hideOverlay()
     return { ok: true }

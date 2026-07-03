@@ -47,7 +47,8 @@ const api = {
   mcp: {
     get: () => invoke<string>('mcp:get'),
     set: (json: string) => invoke('mcp:set', json),
-    status: () => invoke('mcp:status')
+    status: () => invoke('mcp:status'),
+    oauth: (opts: any) => invoke('mcp:oauth', opts)
   },
   sync: {
     status: () => invoke<{ connected: boolean; url?: string; username?: string }>('sync:status'),
@@ -111,7 +112,8 @@ const api = {
     setTheme: (theme: 'light' | 'dark' | 'system') => ipcRenderer.invoke('ui:theme', theme)
   },
   quick: {
-    capture: () => ipcRenderer.invoke('quick:capture') as Promise<{ data: string; mediaType: string } | null>,
+    capture: (mode?: 'region' | 'window') =>
+      ipcRenderer.invoke('quick:capture', mode) as Promise<{ data: string; mediaType: string } | null>,
     submit: (payload: { text: string; image?: { data: string; mediaType: string } | null }) =>
       ipcRenderer.invoke('quick:submit', payload),
     close: () => ipcRenderer.invoke('quick:close'),

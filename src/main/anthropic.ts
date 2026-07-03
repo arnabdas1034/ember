@@ -8,6 +8,7 @@ import { executeMemoryCommand, memoryDigest } from './memory'
 import { mcp } from './mcp'
 import { agentToolDefs, isAgentTool, executeAgentTool, makeAgentCtx, dirLabel } from './agent'
 import { BROWSER_TOOLS, isBrowserTool, runBrowserTool } from './browser'
+import { FILE_TOOLS, isFileTool, runFileTool } from './filegen'
 import { store } from './store'
 
 // Client-executed tool that lets Claude look through the user's past conversations.
@@ -25,11 +26,12 @@ function chatSearchToolDef(): any {
 }
 
 const RESEARCH_PROMPT = `You are in Research mode. Conduct an exhaustive, multi-step investigation before answering:
-1. Break the question into sub-questions and angles worth covering.
-2. Use web_search repeatedly — different phrasings, follow-up queries, recent-date queries. Do not stop after one or two searches.
-3. Use web_fetch to read the most promising sources in full, not just snippets.
-4. Cross-check important claims across at least two independent sources; note disagreements.
-5. Deliver a structured report: a direct headline answer first, then key findings, then supporting detail, and finish with a "Sources" section listing every URL you used.`
+1. Decompose the question into a written list of concrete sub-questions and distinct angles (technical, practical, opposing views, recent developments). Cover each one.
+2. For every sub-question, use web_search with several different phrasings and follow-up queries, including recent-date queries. Do not stop after one or two searches — aim for broad coverage across many sources.
+3. Use web_fetch to read the most authoritative sources in full, not just snippets. Prefer primary sources and disagreeing viewpoints.
+4. Cross-check every important claim against at least two independent sources; explicitly note conflicts, uncertainty, and gaps.
+5. Before finalizing, do a self-check pass: which sub-questions are still thin or unverified? Run more searches to close those gaps.
+6. Deliver a structured report: a direct headline answer first, then key findings grouped by theme, then supporting detail and caveats, and finish with a "Sources" section listing every URL you used with a one-line note on each.`
 
 const MEMORY_PROMPT = `You have a persistent memory directory at /memories (via the memory tool). It persists across all conversations with this user. At the start of substantive tasks, check relevant memory files. Save durable facts the user shares (preferences, projects, context about who they are), corrections they give you, and important conclusions — one topic per file, concise markdown. Update or delete stale entries rather than duplicating. Don't store secrets or trivia.`
 
@@ -155,6 +157,10 @@ async function runClientTool(userId: string, agentCtx: any, block: any, chatId?:
     const res = await runBrowserTool(block.name, block.input || {})
     return { type: 'tool_result', tool_use_id: block.id, content: res.content, is_error: res.isError }
   }
+  if (isFileTool(block.name)) {
+    const res = await runFileTool(block.name, block.input || {})
+    return { type: 'tool_result', tool_use_id: block.id, content: res.content, is_error: res.isError }
+  }
   if (block.name === 'search_past_chats') {
     const hits = store.searchChats(userId, block.input?.query || '', chatId)
     const content = hits.length
@@ -200,6 +206,7 @@ export async function runChat(win: BrowserWindow, apiKey: string, req: ChatReque
     ...buildTools(req),
     ...(hasWorkdir ? agentToolDefs() : []),
     ...(req.browser ? BROWSER_TOOLS : []),
+    ...FILE_TOOLS,
     ...(req.chatSearch && !req.incognito ? [chatSearchToolDef()] : []),
     ...mcp.toolDefinitions(userId)
   ]

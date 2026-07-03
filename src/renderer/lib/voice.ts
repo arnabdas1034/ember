@@ -131,6 +131,36 @@ function stripForSpeech(text: string): string {
     .trim()
 }
 
+// Prefer high-quality macOS neural voices over the default robotic one.
+// Names vary by OS version, so we rank by known-good names and quality hints.
+const PREFERRED_VOICES = [
+  'Ava (Premium)', 'Zoe (Premium)', 'Evan (Premium)', 'Nathan (Premium)',
+  'Ava (Enhanced)', 'Samantha (Enhanced)', 'Allison (Enhanced)', 'Tom (Enhanced)',
+  'Samantha', 'Ava', 'Allison', 'Serena', 'Zoe', 'Daniel', 'Karen'
+]
+
+let cachedVoice: SpeechSynthesisVoice | null | undefined
+
+function pickVoice(): SpeechSynthesisVoice | null {
+  if (cachedVoice !== undefined) return cachedVoice
+  const voices = window.speechSynthesis.getVoices()
+  if (!voices.length) return null // not loaded yet; try again later
+  const byName = (n: string) => voices.find((v) => v.name === n)
+  let best: SpeechSynthesisVoice | undefined
+  for (const name of PREFERRED_VOICES) {
+    best = byName(name)
+    if (best) break
+  }
+  // Fallbacks: any Premium/Enhanced en-US voice, else any en voice.
+  best =
+    best ||
+    voices.find((v) => v.lang.startsWith('en') && /premium|enhanced/i.test(v.name)) ||
+    voices.find((v) => v.lang === 'en-US' && v.localService) ||
+    voices.find((v) => v.lang.startsWith('en'))
+  cachedVoice = best || null
+  return cachedVoice
+}
+
 export function speak(text: string): Promise<void> {
   return new Promise((resolve) => {
     try {
@@ -139,7 +169,9 @@ export function speak(text: string): Promise<void> {
       const clean = stripForSpeech(text).slice(0, 4000)
       if (!clean) return resolve()
       const u = new SpeechSynthesisUtterance(clean)
-      u.rate = 1.03
+      const voice = pickVoice()
+      if (voice) u.voice = voice
+      u.rate = 1.0
       u.pitch = 1
       u.onend = () => resolve()
       u.onerror = () => resolve()
@@ -148,6 +180,14 @@ export function speak(text: string): Promise<void> {
       resolve()
     }
   })
+}
+
+// Voices load asynchronously in Chromium — warm the cache once they arrive.
+if (typeof window !== 'undefined' && window.speechSynthesis) {
+  window.speechSynthesis.onvoiceschanged = () => {
+    cachedVoice = undefined
+    pickVoice()
+  }
 }
 
 export function cancelSpeech(): void {
