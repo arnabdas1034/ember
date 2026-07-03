@@ -1,0 +1,204 @@
+@import 'highlight.js/styles/atom-one-light.css';
+@import 'katex/dist/katex.min.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-size-base: 16px;
+  /* Light (warm cream) — RGB triplets so Tailwind opacity modifiers work. */
+  --clay: 204 120 92;
+  --clay-dark: 184 92 62;
+  --cream: 245 244 238;
+  --cream-panel: 251 250 247;
+  --cream-sunk: 239 237 228;
+  --ink: 42 38 34;
+  --ink-soft: 92 85 76;
+  --ink-faint: 138 129 117;
+  --line: 228 225 214;
+  --line-strong: 214 210 196;
+}
+
+.dark {
+  /* Warm charcoal dark theme, same clay accent. */
+  --clay: 216 139 111;
+  --clay-dark: 204 120 92;
+  --cream: 28 27 25;
+  --cream-panel: 40 38 35;
+  --cream-sunk: 22 21 19;
+  --ink: 237 234 228;
+  --ink-soft: 190 184 173;
+  --ink-faint: 140 133 122;
+  --line: 58 55 50;
+  --line-strong: 76 72 65;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: rgb(var(--cream));
+  color: rgb(var(--ink));
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;
+  font-size: var(--font-size-base);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--line-strong));
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--ink-faint));
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.drag {
+  -webkit-app-region: drag;
+}
+.no-drag {
+  -webkit-app-region: no-drag;
+}
+
+/* Markdown / prose styling */
+.prose-ember {
+  line-height: 1.7;
+  word-break: break-word;
+}
+.prose-ember p {
+  margin: 0 0 0.9em;
+}
+.prose-ember h1,
+.prose-ember h2,
+.prose-ember h3,
+.prose-ember h4 {
+  font-family: Georgia, 'Tiempos', serif;
+  font-weight: 600;
+  line-height: 1.3;
+  margin: 1.2em 0 0.5em;
+  color: rgb(var(--ink));
+}
+.prose-ember h1 {
+  font-size: 1.5em;
+}
+.prose-ember h2 {
+  font-size: 1.3em;
+}
+.prose-ember h3 {
+  font-size: 1.12em;
+}
+.prose-ember ul,
+.prose-ember ol {
+  margin: 0 0 0.9em;
+  padding-left: 1.4em;
+}
+.prose-ember li {
+  margin: 0.25em 0;
+}
+.prose-ember a {
+  color: rgb(var(--clay-dark));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.prose-ember blockquote {
+  border-left: 3px solid rgb(var(--line-strong));
+  margin: 0 0 0.9em;
+  padding: 0.1em 0 0.1em 1em;
+  color: rgb(var(--ink-soft));
+}
+.prose-ember code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.88em;
+  background: rgb(var(--cream-sunk));
+  padding: 0.12em 0.35em;
+  border-radius: 5px;
+}
+.prose-ember pre {
+  background: rgb(var(--cream-sunk));
+  border: 1px solid rgb(var(--line));
+  border-radius: 12px;
+  padding: 0;
+  margin: 0 0 1em;
+  overflow: hidden;
+}
+.prose-ember pre code {
+  display: block;
+  background: transparent;
+  padding: 14px 16px;
+  overflow-x: auto;
+  font-size: 0.85em;
+  line-height: 1.6;
+}
+.prose-ember table {
+  border-collapse: collapse;
+  margin: 0 0 1em;
+  font-size: 0.92em;
+  width: 100%;
+}
+.prose-ember th,
+.prose-ember td {
+  border: 1px solid rgb(var(--line));
+  padding: 7px 11px;
+  text-align: left;
+}
+.prose-ember th {
+  background: rgb(var(--cream-sunk));
+  font-weight: 600;
+}
+.prose-ember hr {
+  border: none;
+  border-top: 1px solid rgb(var(--line));
+  margin: 1.4em 0;
+}
+
+/* Keep highlighted code legible on the dark charcoal panels. */
+.dark .hljs {
+  color: rgb(var(--ink));
+  background: transparent;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.2; }
+}
+.caret {
+  display: inline-block;
+  width: 8px;
+  height: 1.05em;
+  background: rgb(var(--clay));
+  vertical-align: text-bottom;
+  margin-left: 1px;
+  border-radius: 1px;
+  animation: blink 1s step-start infinite;
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.fade-up {
+  animation: fadeUp 0.25s ease-out;
+}
+
+textarea {
+  font-family: inherit;
+}

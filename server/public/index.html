@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Ember</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+      :root { --clay:#CC785C; --cream:#F5F4EE; --panel:#FBFAF7; --sunk:#EFEDE4; --ink:#2A2622; --soft:#5C554C; --faint:#8A8175; --line:#E4E1D6; }
+      * { box-sizing:border-box; }
+      body { margin:0; font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Helvetica,Arial,sans-serif; background:var(--cream); color:var(--ink); }
+      .serif { font-family:Georgia,'Times New Roman',serif; }
+      button { font:inherit; cursor:pointer; }
+      input,textarea { font:inherit; }
+      .btn { background:var(--clay); color:#fff; border:none; border-radius:12px; padding:10px 16px; font-weight:500; }
+      .btn:disabled { opacity:.5; }
+      .field { width:100%; padding:11px 14px; border:1px solid var(--line); border-radius:12px; background:#fff; outline:none; }
+      .field:focus { border-color:var(--clay); }
+      .bubble-user { background:var(--sunk); border-radius:16px; padding:12px 16px; }
+      .row { display:flex; }
+      a { color:var(--clay); }
+      pre { background:#f0eee6; padding:12px; border-radius:10px; overflow:auto; }
+      code { font-family:ui-monospace,Menlo,monospace; font-size:13px; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="text/babel" data-presets="react">
+      const { useState, useEffect, useRef } = React
+      const API = ''
+      const tokenKey = 'ember_token'
+
+      function api(path, opts = {}) {
+        const token = localStorage.getItem(tokenKey)
+        return fetch(API + path, {
+          ...opts,
+          headers: { 'content-type': 'application/json', ...(token ? { authorization: 'Bearer ' + token } : {}), ...(opts.headers || {}) }
+        })
+      }
+
+      function uid() { return Math.random().toString(36).slice(2) + Date.now().toString(36) }
+
+      // very light markdown → html (paragraphs, code fences, bold, inline code, links)
+      function md(text) {
+        let html = (text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        html = html.replace(/```([\s\S]*?)```/g, (_m, c) => '<pre><code>' + c.replace(/^\n/, '') + '</code></pre>')
+        html = html.replace(/`([^`]+)`/g, '<code>$1</code>')
+        html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+        html = html.replace(/\[([^\]]+)\]\((https?:[^)]+)\)/g, '<a href="$2" target="_blank">$1</a>')
+        html = html.replace(/\n{2,}/g, '</p><p>').replace(/\n/g, '<br/>')
+        return '<p>' + html + '</p>'
+      }
+
+      function Auth({ onAuth }) {
+        const [mode, setMode] = useState('login')
+        const [u, setU] = useState(''); const [p, setP] = useState(''); const [err, setErr] = useState('')
+        const submit = async () => {
+          setErr('')
+          const res = await api('/api/auth/' + mode, { method: 'POST', body: JSON.stringify({ username: u, password: p }) })
+          const data = await res.json()
+          if (!res.ok) return setErr(data.error || 'Failed')
+          localStorage.setItem(tokenKey, data.token)
+          onAuth(data)
+        }
+        return (
+          <div style={{ maxWidth: 380, margin: '12vh auto', padding: 24 }}>
+            <div style={{ textAlign: 'center', marginBottom: 24 }}>
+              <div className="serif" style={{ fontSize: 40, color: 'var(--clay)' }}>✳</div>
+              <h1 className="serif" style={{ margin: '8px 0' }}>Ember</h1>
+              <p style={{ color: 'var(--faint)', fontSize: 14 }}>Your Claude workspace, synced to your own server.</p>
+            </div>
+            <input className="field" placeholder="Username" value={u} onChange={e => setU(e.target.value)} style={{ marginBottom: 10 }} />
+            <input className="field" type="password" placeholder="Password" value={p} onChange={e => setP(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && submit()} style={{ marginBottom: 14 }} />
+            {err && <div style={{ color: '#c0392b', fontSize: 13, marginBottom: 10 }}>{err}</div>}
+            <button className="btn" style={{ width: '100%' }} onClick={submit}>{mode === 'login' ? 'Log in' : 'Create account'}</button>
+            <p style={{ textAlign: 'center', fontSize: 13, marginTop: 14, color: 'var(--faint)' }}>
+              {mode === 'login' ? 'No account?' : 'Have an account?'}{' '}
+              <a onClick={() => setMode(mode === 'login' ? 'register' : 'login')} style={{ cursor: 'pointer' }}>
+                {mode === 'login' ? 'Sign up' : 'Log in'}
+              </a>
+            </p>
+          </div>
+        )
+      }
+
+      function App() {
+        const [user, setUser] = useState(null)
+        const [ready, setReady] = useState(false)
+        const [hasKey, setHasKey] = useState(false)
+        const [keyInput, setKeyInput] = useState('')
+        const [data, setData] = useState({ chats: [], settings: {}, projects: [], skills: [] })
+        const [currentId, setCurrentId] = useState(null)
+        const [text, setText] = useState('')
+        const [streaming, setStreaming] = useState(false)
+        const scroller = useRef(null)
+
+        useEffect(() => {
+          if (!localStorage.getItem(tokenKey)) return setReady(true)
+          api('/api/me').then(r => r.ok ? r.json() : null).then(me => {
+            if (me) { setUser(me); loadAll() } else setReady(true)
+          })
+        }, [])
+
+        const loadAll = async () => {
+          const [d, k] = await Promise.all([api('/api/data').then(r => r.json()), api('/api/key/has').then(r => r.json())])
+          setData(d); setHasKey(k.hasKey)
+          setCurrentId(d.chats[0]?.id || null)
+          setReady(true)
+        }
+
+        const persist = async (next) => {
+          setData(next)
+          api('/api/data/replace', { method: 'POST', body: JSON.stringify(next) })
+        }
+
+        const saveKey = async () => {
+          const res = await api('/api/key', { method: 'POST', body: JSON.stringify({ key: keyInput }) })
+          const j = await res.json(); setHasKey(j.hasKey); setKeyInput('')
+        }
+
+        const current = data.chats.find(c => c.id === currentId)
+
+        const newChat = () => {
+          const chat = { id: uid(), title: 'New chat', model: data.settings.defaultModel || 'claude-fable-5', messages: [], createdAt: Date.now(), updatedAt: Date.now() }
+          const next = { ...data, chats: [chat, ...data.chats] }
+          setData(next); setCurrentId(chat.id)
+        }
+
+        const send = async () => {
+          if (!text.trim() || streaming) return
+          let chat = current
+          if (!chat) { newChat(); chat = data.chats[0] }
+          const userMsg = { id: uid(), role: 'user', text: text.trim(), createdAt: Date.now() }
+          const asstMsg = { id: uid(), role: 'assistant', text: '', createdAt: Date.now() }
+          const msg = text.trim()
+          setText('')
+          let chats = data.chats.map(c => c.id === chat.id ? { ...c, messages: [...c.messages, userMsg, asstMsg], updatedAt: Date.now() } : c)
+          let next = { ...data, chats }; setData(next); setStreaming(true)
+
+          const apiMessages = chat.messages.concat(userMsg).map(m => ({ role: m.role, content: m.text }))
+          try {
+            const res = await api('/api/chat', {
+              method: 'POST',
+              body: JSON.stringify({ model: chat.model, system: data.settings.personalInstructions || '', messages: apiMessages, thinking: true })
+            })
+            if (!res.ok || !res.body) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Error') }
+            const reader = res.body.getReader(); const dec = new TextDecoder(); let buf = ''; let acc = ''
+            for (;;) {
+              const { done, value } = await reader.read(); if (done) break
+              buf += dec.decode(value, { stream: true })
+              const lines = buf.split('\n'); buf = lines.pop()
+              for (const line of lines) {
+                if (!line.startsWith('data:')) continue
+                try {
+                  const ev = JSON.parse(line.slice(5).trim())
+                  if (ev.type === 'content_block_delta' && ev.delta?.type === 'text_delta') {
+                    acc += ev.delta.text
+                    setData(d => ({ ...d, chats: d.chats.map(c => c.id === chat.id ? { ...c, messages: c.messages.map(m => m.id === asstMsg.id ? { ...m, text: acc } : m) } : c) }))
+                    scroller.current && (scroller.current.scrollTop = scroller.current.scrollHeight)
+                  }
+                } catch {}
+              }
+            }
+          } catch (e) {
+            setData(d => ({ ...d, chats: d.chats.map(c => c.id === chat.id ? { ...c, messages: c.messages.map(m => m.id === asstMsg.id ? { ...m, text: '⚠️ ' + e.message } : m) } : c) }))
+          } finally {
+            setStreaming(false)
+            setData(d => { const nn = { ...d }; api('/api/data/replace', { method: 'POST', body: JSON.stringify(nn) }); return nn })
+            if (chat.title === 'New chat') {
+              setData(d => ({ ...d, chats: d.chats.map(c => c.id === chat.id ? { ...c, title: msg.slice(0, 40) } : c) }))
+            }
+          }
+        }
+
+        const share = async () => {
+          if (!current) return
+          await api('/api/data/replace', { method: 'POST', body: JSON.stringify(data) })
+          const res = await api('/api/share', { method: 'POST', body: JSON.stringify({ chatId: current.id }) })
+          const j = await res.json()
+          prompt('Public share link:', location.origin + j.url)
+        }
+
+        const logout = () => { localStorage.removeItem(tokenKey); location.reload() }
+
+        if (!ready) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--faint)' }}>Loading…</div>
+        if (!user) return <Auth onAuth={u => { setUser(u); loadAll() }} />
+
+        return (
+          <div style={{ display: 'flex', height: '100vh' }}>
+            <aside style={{ width: 260, borderRight: '1px solid var(--line)', background: 'var(--panel)', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ padding: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span className="serif" style={{ color: 'var(--clay)', fontSize: 20 }}>✳</span>
+                <b className="serif">Ember</b>
+                <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--faint)' }}>{user.username}</span>
+              </div>
+              <div style={{ padding: '0 12px' }}>
+                <button className="btn" style={{ width: '100%' }} onClick={newChat}>+ New chat</button>
+              </div>
+              <div style={{ flex: 1, overflow: 'auto', padding: 8 }}>
+                {data.chats.map(c => (
+                  <div key={c.id} onClick={() => setCurrentId(c.id)}
+                    style={{ padding: '9px 11px', borderRadius: 10, cursor: 'pointer', fontSize: 14, background: c.id === currentId ? 'var(--sunk)' : 'transparent', marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {c.title || 'New chat'}
+                  </div>
+                ))}
+              </div>
+              <div style={{ padding: 12, borderTop: '1px solid var(--line)', fontSize: 13 }}>
+                <a onClick={logout} style={{ cursor: 'pointer' }}>Log out</a>
+              </div>
+            </aside>
+
+            <main style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+              {!hasKey && (
+                <div style={{ padding: 16, background: '#fdf6ef', borderBottom: '1px solid var(--line)' }}>
+                  <div style={{ fontSize: 14, marginBottom: 8 }}>Add your Anthropic API key to start chatting (stored encrypted on your server).</div>
+                  <div className="row" style={{ gap: 8 }}>
+                    <input className="field" placeholder="sk-ant-…" value={keyInput} onChange={e => setKeyInput(e.target.value)} />
+                    <button className="btn" onClick={saveKey}>Save</button>
+                  </div>
+                </div>
+              )}
+              <div ref={scroller} style={{ flex: 1, overflow: 'auto', padding: '24px 0' }}>
+                <div style={{ maxWidth: 720, margin: '0 auto', padding: '0 20px' }}>
+                  {current && current.messages.map(m => (
+                    <div key={m.id} style={{ marginBottom: 22 }}>
+                      {m.role === 'user'
+                        ? <div className="row" style={{ justifyContent: 'flex-end' }}><div className="bubble-user" style={{ maxWidth: '80%' }}>{m.text}</div></div>
+                        : <div dangerouslySetInnerHTML={{ __html: md(m.text) }} style={{ lineHeight: 1.6 }} />}
+                    </div>
+                  ))}
+                  {(!current || current.messages.length === 0) && (
+                    <div style={{ textAlign: 'center', marginTop: '18vh', color: 'var(--faint)' }}>
+                      <div className="serif" style={{ fontSize: 26, color: 'var(--ink)' }}>How can I help?</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div style={{ padding: 16 }}>
+                <div style={{ maxWidth: 720, margin: '0 auto' }}>
+                  <div style={{ border: '1px solid var(--line)', borderRadius: 18, background: 'var(--panel)', padding: 10 }}>
+                    <textarea className="field" style={{ border: 'none', background: 'transparent', resize: 'none', minHeight: 44 }} rows={1}
+                      placeholder="Message Ember…" value={text}
+                      onChange={e => setText(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }} />
+                    <div className="row" style={{ alignItems: 'center', gap: 8, paddingTop: 4 }}>
+                      {current && <button onClick={share} style={{ background: 'none', border: '1px solid var(--line)', borderRadius: 10, padding: '6px 12px', fontSize: 13 }}>Share</button>}
+                      <span style={{ marginLeft: 'auto' }} />
+                      <button className="btn" disabled={streaming || !text.trim()} onClick={send}>{streaming ? '…' : 'Send'}</button>
+                    </div>
+                  </div>
+                  <p style={{ textAlign: 'center', fontSize: 11, color: 'var(--faint)', marginTop: 8 }}>Synced with your Ember server · runs on your own API key</p>
+                </div>
+              </div>
+            </main>
+          </div>
+        )
+      }
+
+      ReactDOM.createRoot(document.getElementById('root')).render(<App />)
+    </script>
+  </body>
+</html>
